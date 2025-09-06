@@ -2,7 +2,7 @@ from google.genai.types import Content, GenerateContentConfig, Part
 from google import genai
 import json, os
 
-from utils import clean_json_response, tool_to_string
+from utils import extract_json_objects, tool_to_string
 from system import SYSTEM_PROMPT_TEMPLATE
 
 from dotenv import load_dotenv
@@ -52,30 +52,31 @@ class Agent:
         ]
 
         while True:
-            msg = self.llm(SYSTEM_PROMPT, history)
-            if debug : print(f"[DEBUG:62] {repr(msg)}")
             try:
-                response = clean_json_response(msg)
-                history.append({"role": "user", "content": msg})
+                response = self.llm(SYSTEM_PROMPT, history)
+                if debug : print(f"[DEBUG:57] {repr(response)}")
 
-                if response.get("type") == "output":
-                    return response.get("output")
-                
-                if response.get("type") == "action":
-                    tool_name = response.get("function")
-                    tool_input = response.get("input")
+                steps = extract_json_objects(response)
+                for step in steps:
+                    history.append({"role": "user", "content": json.dumps(step)})
+                    
+                    if step.get("type") == "output":
+                        return step.get("output")
+                    
+                    if step.get("type") == "action":
+                        tool_name = step.get("function")
+                        tool_input = step.get("input")
 
-                    if tool_name not in self.tools:
-                        print(f"Unknown tool: {tool_name}")
-                        break
+                        if tool_name not in self.tools:
+                            print(f"Unknown tool: {tool_name}")
+                            break
 
-                    observation = {
-                        "type": "observation",
-                        "observation": self.tools[tool_name](**tool_input)
-                    }
-                    if debug : print(f"[DEBUG:82] {observation}")
-                    history.append({"role":"user", "content": json.dumps(observation)})
-
+                        observation = {
+                            "type": "observation",
+                            "observation": self.tools[tool_name](**tool_input)
+                        }
+                        if debug : print(f"[DEBUG:78] {observation}")
+                        history.append({"role":"user", "content": json.dumps(observation)})
             except Exception as e:
                 print(f"Something went wrong: {e}")
                 break
