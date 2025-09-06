@@ -1,14 +1,15 @@
 from google.genai.types import Content, GenerateContentConfig, Part
 from google import genai
-import json
+import json, os
 
 from utils import clean_json_response, tool_to_string
 from system import SYSTEM_PROMPT_TEMPLATE
 
+from dotenv import load_dotenv
 
-API_KEY = "AIzaSyBjBVN-yPEkuBCumrpCX9c3AVVgRdbSzds"
+load_dotenv()
 
-client = genai.Client(api_key=API_KEY)
+client = genai.Client(api_key=os.getenv("API_KEY"))
 
 
 
