@@ -13,7 +13,6 @@ client = genai.Client(api_key=os.getenv("API_KEY"))
 
 
 
-
 class Agent:
     def __init__(self):
         self.tools = {}
@@ -26,7 +25,6 @@ class Agent:
             )
             for entry in history
         ]
-        print(contents)
 
         response = client.models.generate_content(
             model="gemini-2.5-flash",
@@ -58,7 +56,7 @@ class Agent:
             if debug : print(f"[DEBUG:62] {repr(msg)}")
             try:
                 response = clean_json_response(msg)
-                history.append({"role": "model", "content": msg})
+                history.append({"role": "user", "content": msg})
 
                 if response.get("type") == "output":
                     return response.get("output")
