@@ -1,38 +1,15 @@
-from google.genai.types import Content, GenerateContentConfig, Part
-from google import genai
-import json, os
+import json
 
 from utils import extract_json_objects, tool_to_string
 from system import SYSTEM_PROMPT_TEMPLATE
-
-from dotenv import load_dotenv
-
-load_dotenv()
-
-client = genai.Client(api_key=os.getenv("API_KEY"))
-
+from llm import LLM
 
 
 class Agent:
-    def __init__(self):
+    def __init__(self, llm: LLM, context="You are a helpful assistant."):
         self.tools = {}
-    
-    def llm(self, system_instruction, history):
-        contents = [
-            Content(
-                role=entry["role"],
-                parts=[Part(text=entry["content"])]
-            )
-            for entry in history
-        ]
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=GenerateContentConfig(system_instruction=system_instruction)
-        )
-
-        return response.candidates[0].content.parts[0].text
+        self.llm = llm
+        self.context = context
 
     def register_tool(self,func):
         def wrapper(*args,**kargs):
@@ -45,7 +22,7 @@ class Agent:
     def invoke(self, prompt, debug=False):
         tools = "\n".join(tool_to_string(func) for func in self.tools.values())
 
-        SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(tools=tools)
+        SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(context=self.context,tools=tools)
 
         history = [
             {"role": "user", "content": json.dumps({"type": "user", "user": prompt})}
@@ -53,7 +30,7 @@ class Agent:
 
         while True:
             try:
-                response = self.llm(SYSTEM_PROMPT, history)
+                response = self.llm.generate_response(system_instruction=SYSTEM_PROMPT, content=history)
                 if debug : print(f"[DEBUG:57] {repr(response)}")
 
                 steps = extract_json_objects(response)
@@ -86,16 +63,3 @@ class Agent:
 
 
 
-
-
-
-
-
-
-
-
-    #           action 
-    #         7         \
-    #        /           \
-    #       /             \|
-    #   thought <------- observation ------> output
