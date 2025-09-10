@@ -1,27 +1,53 @@
 import json
 
-from utils import extract_json_objects, tool_to_string
-from system import SYSTEM_PROMPT_TEMPLATE
-from llm import LLM
+from .utils import extract_json_objects
+from .system import SYSTEM_PROMPT_TEMPLATE
+from .tool import Tool
+from .llm import LLM
+
 
 
 class Agent:
     def __init__(self, llm: LLM, context="You are a helpful assistant."):
         self.tools = {}
+        self.mcp = {}
         self.llm = llm
         self.context = context
 
-    def register_tool(self,func):
+    def register_tool(self, func, description=None, schema=None):
         def wrapper(*args,**kargs):
-            print(f"running tool {func.__name__}")
+            print(f"Running tool {func.__name__}")
             return func(*args,**kargs)
 
-        self.tools[func.__name__] = func
+        self.tools[func.__name__] = Tool(
+            wrapper,
+            name=func.__name__,
+            description=description or func.__doc__ or "No description available",
+            schema=schema
+        )
         return wrapper
+    
+    def register_mcp(self,mcp_client):
+        self.mcp = mcp_client
 
-    def invoke(self, prompt, debug=False):
-        tools = "\n".join(tool_to_string(func) for func in self.tools.values())
+        for tool in mcp_client.tools:
+            name = tool.name
 
+            async def mcp_tool_wrapper(**kwargs):
+                print(f"Calling MCP tool {name} with {kwargs}")
+                response = await mcp_client.session.call_tool(name, kwargs)
+                return response.content[0].text if response.content else None
+
+            self.tools[name] = Tool(
+                mcp_tool_wrapper,
+                name=name,
+                description=tool.description,
+                schema=tool.inputSchema
+            )
+
+
+    async def ainvoke(self, prompt, debug=False):
+        tools = "\n".join( str(tool) for tool in self.tools.values())
         SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(context=self.context,tools=tools)
 
         history = [
@@ -50,16 +76,12 @@ class Agent:
 
                         observation = {
                             "type": "observation",
-                            "observation": self.tools[tool_name](**tool_input)
+                            "observation": await self.tools[tool_name].acall(tool_input)
                         }
                         if debug : print(f"[DEBUG:78] {observation}")
                         history.append({"role":"user", "content": json.dumps(observation)})
             except Exception as e:
                 print(f"Something went wrong: {e}")
                 break
-
-
-
-
 
 

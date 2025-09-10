@@ -5,7 +5,6 @@ def tool_to_string(func):
     doc = inspect.getdoc(func) or "No description"
     return f"- {func.__name__}{sig}: {doc}"
 
-
 def clean_json_response(msg: str):
     try:
         return json.loads(msg)

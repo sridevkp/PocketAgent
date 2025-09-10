@@ -1,9 +1,12 @@
-from agent import Agent
-from llm import MistralLLM, GenaiLLM, CoherelLLM
-from tools import http_get
 import random, os
+import asyncio
 from dotenv import load_dotenv
 load_dotenv()
+
+from pocket_agent.llm import MistralLLM, GenaiLLM, CoherelLLM
+from pocket_agent.agent import Agent
+from tools import http_get
+from pocket_agent.mcp_client import MCPClient
 
 
 # llm = GenaiLLM(os.getenv("GEMINI_API_KEY"))
@@ -29,10 +32,23 @@ def get_temperature(place_name: str) -> int:
 agent.register_tool(http_get)
 
 
-while True:
-    prompt = input("> ").strip()
-    if prompt:
-        if prompt in ["thanks", "exit", "tq"]:
-            break
-        output = agent.invoke(prompt, True)
-        print(f"@ {output}")
+async def main():
+    file_system_mcp = MCPClient()
+    await file_system_mcp.connect_to_local_server("server.py")
+    agent.register_mcp(file_system_mcp)
+
+    try:
+        while True:
+            prompt = input("> ").strip()
+            if prompt:
+                if prompt in ["thanks", "exit", "tq"]:
+                    break
+                output = await agent.ainvoke(prompt, True)
+                print(f"@ {output}")
+    finally:
+        await file_system_mcp.close()
+        print("🔌 MCP connection closed.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
