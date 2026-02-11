@@ -34,7 +34,7 @@ agent.register_tool(http_get)
 
 async def main():
     file_system_mcp = MCPClient()
-    await file_system_mcp.connect_to_local_server("server.py")
+    await file_system_mcp.connect_to_local_server("fs-server.py")
     agent.register_mcp(file_system_mcp)
 
     try:
