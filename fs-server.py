@@ -25,6 +25,7 @@ restrict the `ROOT_DIR` to a safe directory.
 from pathlib import Path
 import os
 import typing as t
+import json
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -157,15 +158,16 @@ def search(path: str = "", query: str = "", max_results: int = 25) -> t.Dict[str
 
 
 # Additional metadata resource to advertise server capabilities
+
 @mcp.resource("resource://capabilities")
-def capabilities():
-    return {
+def capabilities() -> str:
+    return json.dumps({
         "name": NAME,
         "description": "Filesystem access (read-only) with path-rooting and size limits",
         "tools": ["list_dir", "stat", "read_file", "search"],
         "root": str(ROOT_DIR.resolve()),
         "read_limit_bytes": READ_LIMIT_BYTES,
-    }
+    })
 
 
 if __name__ == "__main__":

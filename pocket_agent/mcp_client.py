@@ -1,8 +1,9 @@
-import asyncio
 import sys
+import httpx2
 from contextlib import AsyncExitStack
+
 from mcp.client.stdio import stdio_client, StdioServerParameters
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
 from mcp.client.session import ClientSession
 
 
@@ -40,14 +41,54 @@ class MCPClient:
             await self.exit_stack.aclose()
             raise
 
-    async def connect_to_sse_server(self, server_url: str, headers=None):
-        """Connect to an MCP server over SSE transport."""
+    async def connect_to_streamable_http_server(
+        self,
+        server_url: str,
+        bearer_token: str | None = None,
+        headers: dict[str, str] | None = None,
+    ):
+        """
+        Connect to a remote MCP server over Streamable HTTP.
+
+        bearer_token: An already-issued access token, if required.
+        headers: Optional additional HTTP headers.
+        """
         try:
-            sse_transport = await self.exit_stack.enter_async_context(
-                sse_client(server_url, headers=headers)
+            request_headers = dict(headers or {})
+
+            if bearer_token:
+                request_headers["Authorization"] = (
+                    f"Bearer {bearer_token}"
+                )
+
+            # HTTP configuration, including headers, belongs here.
+            http_client = await self.exit_stack.enter_async_context(
+                httpx2.AsyncClient(
+                    headers=request_headers,
+                    timeout=httpx2.Timeout(
+                        300.0,
+                        connect=30.0,
+                        write=30.0,
+                        pool=30.0,
+                    ),
+                )
             )
-            self.stdio, self.write = sse_transport
+
+            # Streamable HTTP returns read, write and session ID getter.
+            read_stream, write_stream, _ = (
+                await self.exit_stack.enter_async_context(
+                    streamable_http_client(
+                        server_url,
+                        http_client=http_client,
+                    )
+                )
+            )
+
+            self.stdio = read_stream
+            self.write = write_stream
+
             await self._initialize_session()
+
         except BaseException:
             await self.exit_stack.aclose()
             raise

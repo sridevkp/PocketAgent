@@ -33,9 +33,16 @@ agent.register_tool(http_get)
 
 
 async def main():
-    file_system_mcp = MCPClient()
-    await file_system_mcp.connect_to_local_server("fs-server.py")
-    agent.register_mcp(file_system_mcp)
+    # file_system_mcp = MCPClient()
+    # await file_system_mcp.connect_to_local_server("fs-server.py")
+    # agent.register_mcp(file_system_mcp)
+
+    github_mcp = MCPClient()
+    await github_mcp.connect_to_streamable_http_server(
+        "https://api.githubcopilot.com/mcp/",
+        bearer_token=os.getenv("GITHUB_MCP_TOKEN"),
+        )
+    agent.register_mcp(github_mcp)
 
     try:
         while True:
@@ -46,7 +53,8 @@ async def main():
                 output = await agent.ainvoke(prompt, True)
                 print(f"@ {output}")
     finally:
-        await file_system_mcp.close()
+        # await file_system_mcp.close()
+        await github_mcp.close()
         print("🔌 MCP connection closed.")
 
 
