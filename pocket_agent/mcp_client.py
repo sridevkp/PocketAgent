@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from contextlib import AsyncExitStack
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.sse import sse_client
@@ -21,27 +22,35 @@ class MCPClient:
         if not (is_python or is_js):
             raise ValueError("Server script must be a .py or .js file")
 
-        command = "python" if is_python else "node"
+        command = sys.executable if is_python else "node"
         server_params = StdioServerParameters(
             command=command,
             args=[server_script_path],
             env=None,
         )
 
-        stdio_transport = await self.exit_stack.enter_async_context(
-            stdio_client(server_params)
-        )
-        self.stdio, self.write = stdio_transport
+        try:
+            stdio_transport = await self.exit_stack.enter_async_context(
+                stdio_client(server_params)
+            )
+            self.stdio, self.write = stdio_transport
 
-        await self._initialize_session()
+            await self._initialize_session()
+        except BaseException:
+            await self.exit_stack.aclose()
+            raise
 
     async def connect_to_sse_server(self, server_url: str, headers=None):
         """Connect to an MCP server over SSE transport."""
-        sse_transport = await self.exit_stack.enter_async_context(
-            sse_client(server_url, headers=headers)
-        )
-        self.stdio, self.write = sse_transport
-        await self._initialize_session()
+        try:
+            sse_transport = await self.exit_stack.enter_async_context(
+                sse_client(server_url, headers=headers)
+            )
+            self.stdio, self.write = sse_transport
+            await self._initialize_session()
+        except BaseException:
+            await self.exit_stack.aclose()
+            raise
 
     async def _initialize_session(self):
         self.session = await self.exit_stack.enter_async_context(
