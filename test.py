@@ -1,3 +1,4 @@
+import json
 import random, os
 import asyncio
 from dotenv import load_dotenv
@@ -11,7 +12,13 @@ from pocket_agent.mcp_client import MCPClient
 
 # llm = GenaiLLM(os.getenv("GEMINI_API_KEY"))
 # llm = MistralLLM(os.getenv("MISTRAL_API_KEY"))
-llm = CoherelLLM(api_key=os.getenv("COHERE_API_KEY"))
+MCP_SMOKE_TEST = os.getenv("MCP_SMOKE_TEST", "").lower() in {"1", "true", "yes"}
+
+if MCP_SMOKE_TEST:
+    llm = None
+else:
+    llm = CoherelLLM(api_key=os.getenv("COHERE_API_KEY"))
+
 agent = Agent(llm=llm)
 
 @agent.register_tool
@@ -32,9 +39,47 @@ def get_temperature(place_name: str) -> int:
 agent.register_tool(http_get)
 
 
-async def main():
+async def connect_mcp(client: MCPClient):
+    transport = os.getenv("MCP_TRANSPORT", "local").lower()
+    if transport == "sse":
+        server_url = os.getenv("MCP_SSE_URL")
+        if not server_url:
+            raise ValueError("MCP_SSE_URL is required when MCP_TRANSPORT=sse")
+        headers = json.loads(os.getenv("MCP_SSE_HEADERS", "{}"))
+        await client.connect_to_sse_server(server_url, headers=headers)
+    else:
+        await client.connect_to_local_server("fs-server.py")
+
+
+async def run_mcp_smoke_test():
     file_system_mcp = MCPClient()
-    await file_system_mcp.connect_to_local_server("fs-server.py")
+    try:
+        await connect_mcp(file_system_mcp)
+        agent.register_mcp(file_system_mcp)
+
+        if not file_system_mcp.tools:
+            raise RuntimeError("No MCP tools were discovered from the server.")
+
+        missing_tools = [tool.name for tool in file_system_mcp.tools if tool.name not in agent.tools]
+        if missing_tools:
+            raise RuntimeError(f"MCP tools not registered on agent: {missing_tools}")
+
+        tool_name = os.getenv("MCP_SMOKE_TOOL", file_system_mcp.tools[0].name)
+        tool_input = json.loads(os.getenv("MCP_SMOKE_INPUT", "{}"))
+        result = await agent.tools[tool_name].acall(tool_input)
+        print(f"[SMOKE] MCP tool '{tool_name}' call succeeded: {result}")
+    finally:
+        await file_system_mcp.close()
+        print("🔌 MCP connection closed.")
+
+
+async def main():
+    if MCP_SMOKE_TEST:
+        await run_mcp_smoke_test()
+        return
+
+    file_system_mcp = MCPClient()
+    await connect_mcp(file_system_mcp)
     agent.register_mcp(file_system_mcp)
 
     try:
