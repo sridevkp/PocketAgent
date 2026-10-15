@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import AsyncExitStack
 from mcp.client.stdio import stdio_client, StdioServerParameters
+from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 
 
@@ -32,6 +33,17 @@ class MCPClient:
         )
         self.stdio, self.write = stdio_transport
 
+        await self._initialize_session()
+
+    async def connect_to_sse_server(self, server_url: str, headers=None):
+        """Connect to an MCP server over SSE transport."""
+        sse_transport = await self.exit_stack.enter_async_context(
+            sse_client(server_url, headers=headers)
+        )
+        self.stdio, self.write = sse_transport
+        await self._initialize_session()
+
+    async def _initialize_session(self):
         self.session = await self.exit_stack.enter_async_context(
             ClientSession(self.stdio, self.write)
         )

@@ -32,3 +32,4 @@ This lets the LLM not only reason but also interact with your environment (APIs,
 - Lightweight, no heavy frameworks
 
 - Extendable: add new tools or model providers easily
+- MCP client support for both local stdio servers and remote SSE servers

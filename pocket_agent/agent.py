@@ -33,9 +33,9 @@ class Agent:
         for tool in mcp_client.tools:
             name = tool.name
 
-            async def mcp_tool_wrapper(**kwargs):
-                print(f"Calling MCP tool {name} with {kwargs}")
-                response = await mcp_client.session.call_tool(name, kwargs)
+            async def mcp_tool_wrapper(_tool_name=name, **kwargs):
+                print(f"Calling MCP tool {_tool_name} with {kwargs}")
+                response = await mcp_client.session.call_tool(_tool_name, kwargs)
                 return response.content[0].text if response.content else None
 
             self.tools[name] = Tool(
@@ -83,5 +83,4 @@ class Agent:
             except Exception as e:
                 print(f"Something went wrong: {e}")
                 break
-
 
