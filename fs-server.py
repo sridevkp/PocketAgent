@@ -169,5 +169,5 @@ def capabilities():
 
 
 if __name__ == "__main__":
-    print(f"Starting MCP Filesystem server for root: {ROOT_DIR.resolve()}")
+    print(f"Starting MCP Filesystem server for root: {ROOT_DIR.resolve()}", file=__import__("sys").stderr)
     mcp.run(transport="stdio")
